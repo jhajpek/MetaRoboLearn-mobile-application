@@ -11,16 +11,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useState, useEffect, useRef } from "react";
 import { DeviceMotion, Accelerometer } from "expo-sensors";
-import { io } from "socket.io-client";
 import Constants from "expo-constants";
-import axios from "axios";
+import BrokerClient from "../broker/BrokerClient"
+import RobotList from "../components/RobotList";
 
 
 const { height: HEIGHT, width: WIDTH } = Dimensions.get("screen");
 const CAMERA_WIDTH = 320;
 const CAMERA_HEIGHT = 240;
 const TURN_THRESHOLD = 0.2;
-const COMMAND_DURATION = 0.2;
+const COMMAND_DURATION = 0;
 const JOYSTICK_SIZE = HEIGHT * 0.5;
 const JOYSTICK_RADIUS = JOYSTICK_SIZE * 0.5
 
@@ -32,14 +32,19 @@ const Controller = () => {
     const [isGyroscopeOn, setIsGyroscopeOn] = useState(false);
     const [angle, setAngle] = useState(0);
     const [lastCommand, setLastCommand] = useState("");
-    const [speed, setSpeed] = useState(55);
+    const [speed, setSpeed] = useState(40);
     const [cameraOn, setCameraOn] = useState(false);
     const [handSide, setHandSide] = useState(true);
     const [image, setImage] = useState("");
-    const [url] = useState(Constants.expoConfig.extra.BACKEND_URL);
-    const [port] = useState(Constants.expoConfig.extra.BACKEND_PORT);
     const [isFromController, setIsFromController] = useState(false);
     const timeoutRef = useRef(null);
+
+    const BROKER_URL = Constants.expoConfig.extra.BROKER_HTTP_API;
+    const CLIENT_NAME = Constants.expoConfig.extra.CLIENT_NAME;
+    const API_KEY = Constants.expoConfig.extra.API_KEY;
+    const [brokerClient] = useState(new BrokerClient(BROKER_URL, CLIENT_NAME, API_KEY));
+    const [robotId, setRobotId] = useState(null);
+
 
     const cameraResponderRef = useRef(new Animated.ValueXY({ x: 0, y: HEIGHT - CAMERA_HEIGHT})).current;
     const cameraResponder = useRef(
@@ -54,7 +59,7 @@ const Controller = () => {
                 cameraResponderRef.setValue({ x: 0, y: 0 });
             },
 
-            onPanResponderMove: (gestureEvent, gestureState) => {
+            onPanResponderMove: (_, gestureState) => {
                 const newX = cameraResponderRef.x._offset + gestureState.dx;
                 const newY = cameraResponderRef.y._offset + gestureState.dy;
 
@@ -77,14 +82,14 @@ const Controller = () => {
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
 
-            onPanResponderMove: (_, gesture) => {
-                const distance = Math.sqrt(gesture.dx ** 2 + gesture.dy ** 2);
+            onPanResponderMove: (_, gestureState) => {
+                const distance = Math.sqrt(gestureState.dx ** 2 + gestureState.dy ** 2);
 
-                let x = gesture.dx;
-                let y = gesture.dy;
+                let x = gestureState.dx;
+                let y = gestureState.dy;
 
                 if (distance > JOYSTICK_RADIUS) {
-                    const angle = Math.atan2(gesture.dy, gesture.dx);
+                    const angle = Math.atan2(y, x);
                     x = Math.cos(angle) * JOYSTICK_RADIUS;
                     y = Math.sin(angle) * JOYSTICK_RADIUS;
                 }
@@ -107,7 +112,7 @@ const Controller = () => {
     const handleJoystickMove = (dx, dy) => {
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        if (distance <= JOYSTICK_RADIUS * 0.5) {
+        if (distance <= JOYSTICK_RADIUS * 0.25) {
             setJoystickPosition({ x: 0, y: 0 });
             return;
         }
@@ -118,70 +123,119 @@ const Controller = () => {
         });
     };
 
-    const commandIntervalRef = useRef(null);
     useEffect(() => {
         const { x, y } = joystickPosition;
         const distance = Math.sqrt(x * x + y * y);
-        setSpeed(distance === 0 ? 0 : 40 + Math.min(distance, 1)  * 30);
+        setSpeed(distance === 0 ? 0 : 40 + Math.min(distance, 1)  * 40);
 
-        if (distance <= 0.05) {
-            if (commandIntervalRef.current) {
-                clearInterval(commandIntervalRef.current);
-                commandIntervalRef.current = null;
+        if (distance === 0) {
+            if (lastCommand !== "") {
+                setLastCommand("");
+                abort().then()
             }
-
-            abort().then()
             return;
         }
 
-        let newCommand = "";
+        let newCommand;
         if (Math.abs(y) > Math.abs(x)) {
-            newCommand = y > 0 ? "forward" : "back";
+            newCommand = y > 0 ? "raw_forward" : "raw_back";
         } else {
-            newCommand = x > 0 ? "turn_right" : "turn_left";
+            newCommand = x > 0 ? "raw_turn_right" : "raw_turn_left";
         }
 
         if (newCommand === lastCommand) {
-            console.log("BUG" + newCommand);
             return;
         }
 
-        if (commandIntervalRef.current) {
-            clearInterval(commandIntervalRef.current);
+        if (lastCommand !== "") {
+            setLastCommand("");
+            abort().then();
         }
 
-        abort().then();
-
+        setLastCommand(newCommand);
         execute(newCommand, COMMAND_DURATION, false).then();
-        commandIntervalRef.current = setInterval(() => {
-            execute(newCommand, COMMAND_DURATION, false).then();
-        }, COMMAND_DURATION * 1000);
-
     }, [joystickPosition]);
 
 
+    const VIDEO_WS_BASE = Constants.expoConfig.extra.VIDEO_SERVICE_WEBSOCKET;
+    const ws = useRef(null);
     useEffect(() => {
-        if (!cameraOn) {
+        if (!robotId) {
             return;
         }
 
-        const socket = io(`${ url }:${ port }`);
-
-        socket.on("camera_frame", (data) => {
-            if (data.image) {
-                setImage(`data:image/jpeg;base64,${data.image}`);
+        if (!cameraOn) {
+            if (ws.current) {
+                ws.current.close();
             }
-        });
+            return;
+        }
+
+        const socketUrl = `${VIDEO_WS_BASE}/robot/${robotId}/get-video-stream`;
+        console.log("Connecting to video stream:", socketUrl);
+
+        ws.current = new WebSocket(
+            socketUrl,
+            null,
+            {
+                headers: {
+                    "client-id": brokerClient.clientId,
+                    "token": brokerClient.token,
+                }
+            }
+        );
+
+        ws.current.binaryType = "blob";
+
+        ws.current.onmessage = (event) => {
+            if (event.data instanceof Blob) {
+                const reader = new FileReader();
+
+                reader.onload = () => {
+                    setImage(reader.result);
+                };
+
+                reader.onerror = (e) => {
+                    console.error("FileReader error:", e);
+                };
+
+                reader.readAsDataURL(event.data);
+            } else {
+                try {
+                    const parsed = JSON.parse(event.data);
+                    setImage(`data:image/jpeg;base64,${parsed.data}`);
+                } catch (e) {
+                    setImage(`data:image/jpeg;base64,${event.data}`);
+                }
+            }
+        };
+
+        ws.current.onerror = (e) => {
+            console.log("WS Error:", e.message);
+        };
+
+        ws.current.onclose = () => {
+            console.log("WS for camera feed closed.");
+        };
 
         return () => {
-            socket.disconnect();
-        }
-    }, [cameraOn, image]);
+            if (ws.current) {
+                ws.current.close();
+            }
+        };
+    }, [cameraOn]);
 
     const execute = async (command, duration, isGyroOn) => {
-        await axios.post(`${ url }:${ port }/execute`, {
-            "code": `${ command }(${ duration }, ${ speed })`
-        }).then(() => {
+        await brokerClient.requestWithAuth(
+            `/robot/${robotId}/command`,
+            {
+                method: "POST",
+                body: JSON.stringify({
+                    "CommandType": "CODE",
+                    "CodeText": `${ command }(${ duration }, ${ speed })`
+                })
+            }
+        ).then(() => {
             if (!isGyroOn) {
                 setIsFromController(true);
             }
@@ -192,20 +246,27 @@ const Controller = () => {
                     setIsFromController(false);
                 }
             }, duration * 1000);
-        }).catch((reason) => {
-            console.log(reason);
+        }).catch((err) => {
+            console.log(err);
         });
     };
 
     const abort = async () => {
-        await axios.post(`${ url }:${ port }/abort`)
-            .then(() => {
-                setLastCommand("");
-                setIsFromController(false);
-                clearTimeout(timeoutRef.current);
-            }).catch((reason) => {
-                console.log(reason);
-            });
+        await brokerClient.requestWithAuth(
+        `/robot/${robotId}/command`,
+            {
+                method: "POST",
+                body: JSON.stringify({
+                    "CommandType": "ABORT"
+                })
+            }
+        ).then(() => {
+            setLastCommand("");
+            setIsFromController(false);
+            clearTimeout(timeoutRef.current);
+        }).catch((err) => {
+            console.log(err);
+        });
     };
 
     const cameraClick = () => {
@@ -213,10 +274,6 @@ const Controller = () => {
             Alert.alert("UPALJENA KAMERA", "Prozor u kojem se prikazuje prijenos s kamere možete podesiti njegovim povlačenjem na drugi kraj ekrana.", [ { text: "Zatvori" } ])
         }
         setCameraOn(prev => !prev);
-    };
-
-    const fetchFail = () => {
-        Alert.alert("UPOZORENJE", "Niste spojeni na istu mrežu kao i robot ili robot nije upaljen.", [ { text: "Zatvori" } ]);
     };
 
     useEffect(() => {
@@ -253,12 +310,12 @@ const Controller = () => {
                 setAngle(rotation.beta ?? 0);
 
                 if (angle > TURN_THRESHOLD && lastCommand === "") {
-                    await execute("turn_right", COMMAND_DURATION, true);
+                    await execute("raw_turn_right", COMMAND_DURATION, true);
                 } else if (angle < -TURN_THRESHOLD && lastCommand === "") {
-                    await execute("turn_left", COMMAND_DURATION, true);
+                    await execute("raw_turn_left", COMMAND_DURATION, true);
                 } else if (angle >= -TURN_THRESHOLD && angle <= TURN_THRESHOLD && lastCommand !== "" && !isFromController) {
                     await abort();
-                } else if (lastCommand.startsWith("turn") && !isFromController) {
+                } else if (lastCommand.startsWith("raw_turn") && !isFromController) {
                     await execute(lastCommand, COMMAND_DURATION, true);
                 }
             });
@@ -415,6 +472,24 @@ const Controller = () => {
             </View>
         </View>
     );
+
+    if (!robotId) {
+        return (
+            <View style={ styles.container }>
+                <View style={ styles.blackView }></View>
+                <View style={{ flex: 1, justifyContent: "center" }}>
+                    <Text style={{ textAlign: "center", marginBottom: 20 }}>
+                        Odabir robota
+                    </Text>
+                    <RobotList
+                        client={brokerClient}
+                        onRobotSelected={(id) => setRobotId(id)}
+                    />
+                </View>
+                <View style={ styles.blackView }></View>
+            </View>
+        );
+    }
 
     return (
         <View style={ styles.container }>

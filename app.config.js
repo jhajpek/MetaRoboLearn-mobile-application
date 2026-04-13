@@ -28,10 +28,13 @@ export default {
         },
         extra: {
             eas: {
-                projectId: process.env.PROJECT_ID,
+                projectId: process.env.EXPO_PROJECT_ID,
             },
-            BACKEND_URL: process.env.BACKEND_URL,
-            BACKEND_PORT: process.env.BACKEND_PORT
+            CLIENT_NAME: process.env.CLIENT_NAME,
+            API_KEY: process.env.API_KEY,
+            BROKER_HTTP_API: process.env.BROKER_HTTP_API,
+            BROKER_WEBSOCKET: process.env.BROKER_WEBSOCKET,
+            VIDEO_SERVICE_WEBSOCKET: process.env.VIDEO_SERVICE_WEBSOCKET
         }
     }
 };

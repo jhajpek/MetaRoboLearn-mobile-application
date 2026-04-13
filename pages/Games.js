@@ -8,8 +8,18 @@ import Footer from "../components/Footer";
 
 const { height: HEIGHT, width: WIDTH } = Dimensions.get("screen");
 const GAMES = [
-    { id: 1, name: "Slobodna vožnja", description: "Ova igra pruža kontrolu nad robotom u Vašem okruženju. Moguće je upravljati robotom tipkama te kontrolirati njegovo skretanje žiroskopom. Uz to, omogućen je prijenos uživo s kamere robota." },
-    { id: 2, name: "Prepoznavanje objekata", description: "Osim karakteristika poput upravljanja robotom i prijenosa uživo s kamere robota koje pruža igra Slobodna vožnja, u ovoj igri možete poslati robotu zahtjev da pokuša odgovoriti što se točno nalazi ispred njega." },
+    {
+        id: 1,
+        name: "Slobodna vožnja",
+        description: "Ova igra pruža kontrolu nad robotom u Vašem okruženju. Moguće je upravljati robotom tipkama te kontrolirati njegovo skretanje žiroskopom. Uz to, omogućen je prijenos uživo s kamere robota.",
+        params: null
+    },
+    {
+        id: 2,
+        name: "Prepoznavanje objekata",
+        description: "Osim karakteristika poput upravljanja robotom i prijenosa uživo s kamere robota koje pruža igra Slobodna vožnja, u ovoj igri možete tražiti objekte do isteka vremena koji je predviđen za to.",
+        params: null
+    },
 ];
 
 
