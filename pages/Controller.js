@@ -9,12 +9,12 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { DeviceMotion, Accelerometer } from "expo-sensors";
 import Constants from "expo-constants";
 import BrokerClient from "../broker/BrokerClient"
 import RobotList from "../components/RobotList";
-
+import GAMES_DATA from "../resources/GamesData";
 
 const { height: HEIGHT, width: WIDTH } = Dimensions.get("screen");
 const CAMERA_WIDTH = 320;
@@ -23,28 +23,33 @@ const TURN_THRESHOLD = 0.2;
 const COMMAND_DURATION = 0;
 const JOYSTICK_SIZE = HEIGHT * 0.5;
 const JOYSTICK_RADIUS = JOYSTICK_SIZE * 0.5
+const CAMERA_FEED_WEBSOCKET_BASE_URL = Constants.expoConfig.extra.CAMERA_FEED_WEBSOCKET_BASE_URL;
 
-
-const Controller = () => {
+const Controller = ({ route }) => {
+    const { gameId } = route.params;
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
+
     const [accelerometerOutput, setAccelerometerOutput] = useState({ x: 0, y: 0, z: 0 });
-    const [isGyroscopeOn, setIsGyroscopeOn] = useState(false);
+    const [isDeviceMotionOn, setIsDeviceMotionOn] = useState(false);
     const [angle, setAngle] = useState(0);
     const [lastCommand, setLastCommand] = useState("");
-    const [speed, setSpeed] = useState(40);
+    const [speed, setSpeed] = useState(30);
     const [cameraOn, setCameraOn] = useState(false);
     const [handSide, setHandSide] = useState(true);
     const [image, setImage] = useState("");
-    const [isFromController, setIsFromController] = useState(false);
-    const timeoutRef = useRef(null);
-
-    const BROKER_URL = Constants.expoConfig.extra.BROKER_HTTP_API;
-    const CLIENT_NAME = Constants.expoConfig.extra.CLIENT_NAME;
-    const API_KEY = Constants.expoConfig.extra.API_KEY;
-    const [brokerClient] = useState(new BrokerClient(BROKER_URL, CLIENT_NAME, API_KEY));
+    const [joystickPosition, setJoystickPosition] = useState({ x: 0, y: 0 });
     const [robotId, setRobotId] = useState(null);
 
+    const brokerClient = useMemo(() => new BrokerClient(
+        Constants.expoConfig.extra.BROKER_HTTP_API_BASE_URL,
+        Constants.expoConfig.extra.CLIENT_NAME,
+        Constants.expoConfig.extra.API_KEY
+    ), []);
+    const gamePlugin = useMemo(() => {
+        const currentGame = GAMES_DATA.find(g => g.id === gameId);
+        return currentGame?.plugin ? new currentGame.plugin() : null;
+    }, [gameId]);
 
     const cameraResponderRef = useRef(new Animated.ValueXY({ x: 0, y: HEIGHT - CAMERA_HEIGHT})).current;
     const cameraResponder = useRef(
@@ -75,8 +80,6 @@ const Controller = () => {
             }
         })
     ).current;
-
-    const [joystickPosition, setJoystickPosition] = useState({ x: 0, y: 0 });
     const joystickResponderRef = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
     const joystickResponder = useRef(
         PanResponder.create({
@@ -108,11 +111,12 @@ const Controller = () => {
             }
         })
     ).current;
+    const ws = useRef(null);
 
     const handleJoystickMove = (dx, dy) => {
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        if (distance <= JOYSTICK_RADIUS * 0.25) {
+        if (distance <= JOYSTICK_RADIUS * 0.1) {
             setJoystickPosition({ x: 0, y: 0 });
             return;
         }
@@ -126,15 +130,14 @@ const Controller = () => {
     useEffect(() => {
         const { x, y } = joystickPosition;
         const distance = Math.sqrt(x * x + y * y);
-        setSpeed(distance === 0 ? 0 : 40 + Math.min(distance, 1)  * 40);
 
         if (distance === 0) {
-            if (lastCommand !== "") {
-                setLastCommand("");
-                abort().then()
-            }
+            abort().then()
             return;
         }
+
+        const newSpeed = 30 + Math.min(distance, 1)  * 50
+        const speedDelta = Math.abs(newSpeed - speed);
 
         let newCommand;
         if (Math.abs(y) > Math.abs(x)) {
@@ -143,22 +146,15 @@ const Controller = () => {
             newCommand = x > 0 ? "raw_turn_right" : "raw_turn_left";
         }
 
-        if (newCommand === lastCommand) {
+        if (newCommand === lastCommand && speedDelta < 0.1)  {
             return;
         }
 
-        if (lastCommand !== "") {
-            setLastCommand("");
-            abort().then();
-        }
+        setSpeed(newSpeed);
 
-        setLastCommand(newCommand);
-        execute(newCommand, COMMAND_DURATION, false).then();
+        execute(newCommand, COMMAND_DURATION).then();
     }, [joystickPosition]);
 
-
-    const VIDEO_WS_BASE = Constants.expoConfig.extra.VIDEO_SERVICE_WEBSOCKET;
-    const ws = useRef(null);
     useEffect(() => {
         if (!robotId) {
             return;
@@ -171,8 +167,7 @@ const Controller = () => {
             return;
         }
 
-        const socketUrl = `${VIDEO_WS_BASE}/robot/${robotId}/get-video-stream`;
-        console.log("Connecting to video stream:", socketUrl);
+        const socketUrl = `${CAMERA_FEED_WEBSOCKET_BASE_URL}/robot/${robotId}/get-video-stream`;
 
         ws.current = new WebSocket(
             socketUrl,
@@ -185,6 +180,10 @@ const Controller = () => {
             }
         );
 
+        ws.current.onopen = () => {
+            console.log("Camera Feed WS opened.");
+        };
+
         ws.current.binaryType = "blob";
 
         ws.current.onmessage = (event) => {
@@ -196,7 +195,7 @@ const Controller = () => {
                 };
 
                 reader.onerror = (e) => {
-                    console.error("FileReader error:", e);
+                    console.error("Camera Feed WS --> FileReader error:", e);
                 };
 
                 reader.readAsDataURL(event.data);
@@ -210,12 +209,12 @@ const Controller = () => {
             }
         };
 
-        ws.current.onerror = (e) => {
-            console.log("WS Error:", e.message);
+        ws.current.onclose = () => {
+            console.log("Camera Feed WS closed.");
         };
 
-        ws.current.onclose = () => {
-            console.log("WS for camera feed closed.");
+        ws.current.onerror = (e) => {
+            console.log("Camera Feed WS Error:", e.message);
         };
 
         return () => {
@@ -225,7 +224,60 @@ const Controller = () => {
         };
     }, [cameraOn]);
 
-    const execute = async (command, duration, isGyroOn) => {
+    useEffect(() => {
+        Accelerometer.setUpdateInterval(200);
+        let accelerometerIncome;
+        if (isDeviceMotionOn) {
+            accelerometerIncome = Accelerometer.addListener(
+                ({ x, y, z }) => setAccelerometerOutput({ x: x, y: y, z: z })
+            );
+        } else {
+            accelerometerIncome?.remove();
+        }
+
+        return () => accelerometerIncome?.remove();
+    }, [isDeviceMotionOn, lastCommand]);
+
+    useEffect(() => {
+        DeviceMotion.setUpdateInterval(200);
+        let motionIncome;
+        if (isDeviceMotionOn) {
+            motionIncome = DeviceMotion.addListener(async ({ rotation }) => {
+                if (Math.abs(accelerometerOutput.x) >= 2 ||
+                    Math.abs(accelerometerOutput.y) >= 2 ||
+                    Math.abs(accelerometerOutput.z) >= 2) {
+                    setAccelerometerOutput({ x: 0, y: 0, z: 0 });
+                    setIsDeviceMotionOn(false);
+                    if (lastCommand !== "") {
+                        await abort();
+                    }
+                    return;
+                }
+
+                if (!rotation) {
+                    return;
+                }
+
+                setAngle(rotation.beta ?? 0);
+
+                if (lastCommand === "raw_forward" || lastCommand === "raw_back") {
+                    return;
+                }
+
+                if (angle > TURN_THRESHOLD && lastCommand !== "raw_turn_right") {
+                    await execute("raw_turn_right", COMMAND_DURATION);
+                } else if (angle < -TURN_THRESHOLD && lastCommand !== "raw_turn_left") {
+                    await execute("raw_turn_left", COMMAND_DURATION);
+                } else if (angle >= -TURN_THRESHOLD && angle <= TURN_THRESHOLD && lastCommand !== "") {
+                    await abort();
+                }
+            });
+        } else motionIncome?.remove();
+
+        return () => motionIncome?.remove();
+    }, [accelerometerOutput]);
+
+    const execute = async (command, duration) => {
         await brokerClient.requestWithAuth(
             `/robot/${robotId}/command`,
             {
@@ -236,16 +288,7 @@ const Controller = () => {
                 })
             }
         ).then(() => {
-            if (!isGyroOn) {
-                setIsFromController(true);
-            }
             setLastCommand(command);
-            timeoutRef.current = setTimeout(() => {
-                if (!isGyroOn) {
-                    setLastCommand("");
-                    setIsFromController(false);
-                }
-            }, duration * 1000);
         }).catch((err) => {
             console.log(err);
         });
@@ -253,7 +296,7 @@ const Controller = () => {
 
     const abort = async () => {
         await brokerClient.requestWithAuth(
-        `/robot/${robotId}/command`,
+            `/robot/${robotId}/command`,
             {
                 method: "POST",
                 body: JSON.stringify({
@@ -262,8 +305,6 @@ const Controller = () => {
             }
         ).then(() => {
             setLastCommand("");
-            setIsFromController(false);
-            clearTimeout(timeoutRef.current);
         }).catch((err) => {
             console.log(err);
         });
@@ -275,54 +316,6 @@ const Controller = () => {
         }
         setCameraOn(prev => !prev);
     };
-
-    useEffect(() => {
-        Accelerometer.setUpdateInterval(COMMAND_DURATION * 1000);
-        let accelerometerIncome;
-        if (isGyroscopeOn) {
-            accelerometerIncome = Accelerometer.addListener(
-                ({ x, y, z }) => setAccelerometerOutput({ x: x, y: y, z: z }));
-        } else {
-            accelerometerIncome?.remove();
-        }
-
-        return () => accelerometerIncome?.remove();
-    }, [isGyroscopeOn, lastCommand]);
-
-    useEffect(() => {
-        DeviceMotion.setUpdateInterval(COMMAND_DURATION * 1000);
-        let motionIncome;
-        if (isGyroscopeOn) {
-            motionIncome = DeviceMotion.addListener(async ({ rotation }) => {
-                if (Math.abs(accelerometerOutput.x) >= 2 ||
-                    Math.abs(accelerometerOutput.y) >= 2 ||
-                    Math.abs(accelerometerOutput.z) >= 2) {
-                    setAccelerometerOutput({ x: 0, y: 0, z: 0 });
-                    setIsGyroscopeOn(false);
-                    setLastCommand("");
-                    return;
-                }
-
-                if (!rotation) {
-                    return;
-                }
-
-                setAngle(rotation.beta ?? 0);
-
-                if (angle > TURN_THRESHOLD && lastCommand === "") {
-                    await execute("raw_turn_right", COMMAND_DURATION, true);
-                } else if (angle < -TURN_THRESHOLD && lastCommand === "") {
-                    await execute("raw_turn_left", COMMAND_DURATION, true);
-                } else if (angle >= -TURN_THRESHOLD && angle <= TURN_THRESHOLD && lastCommand !== "" && !isFromController) {
-                    await abort();
-                } else if (lastCommand.startsWith("raw_turn") && !isFromController) {
-                    await execute(lastCommand, COMMAND_DURATION, true);
-                }
-            });
-        } else motionIncome?.remove();
-
-        return () => motionIncome?.remove();
-    }, [accelerometerOutput]);
 
     const styles = StyleSheet.create({
         container: {
@@ -440,21 +433,22 @@ const Controller = () => {
                 <Text style={ styles.label }>Žiroskop:</Text>
                 <Switch
                     trackColor={{ false: "#D7D7D7", true: "#33D3D6" }}
-                    thumbColor={ isGyroscopeOn ? "#00B6BA" : "#FFF" }
+                    thumbColor={ isDeviceMotionOn ? "#00B6BA" : "#FFF" }
                     onValueChange={ () => {
-                        setIsGyroscopeOn(prev => !prev);
+                        setIsDeviceMotionOn(prev => !prev);
                         if(lastCommand !== "") {
                             abort().then(() => {});
                         }
                     }}
-                    value={ isGyroscopeOn }
+                    value={ isDeviceMotionOn }
                     style={{ alignSelf: "center" }}
                 />
             </View>
-            <Text>{ lastCommand }</Text>
-            <Text>
-                x: {joystickPosition.x.toFixed(2)} | y: {joystickPosition.y.toFixed(2)}
-            </Text>
+            {/*<Text>{ lastCommand }</Text>*/}
+            {/*<Text>*/}
+            {/*    x: {joystickPosition.x.toFixed(2)} | y: {joystickPosition.y.toFixed(2)}*/}
+            {/*</Text>*/}
+            { gamePlugin && gamePlugin.render(brokerClient, robotId) }
 
         </View>
     );
@@ -482,8 +476,8 @@ const Controller = () => {
                         Odabir robota
                     </Text>
                     <RobotList
-                        client={brokerClient}
-                        onRobotSelected={(id) => setRobotId(id)}
+                        brokerClient={ brokerClient }
+                        onRobotSelected={ (id) => setRobotId(id) }
                     />
                 </View>
                 <View style={ styles.blackView }></View>

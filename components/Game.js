@@ -1,7 +1,6 @@
 import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 
-
 const { height: HEIGHT, width: WIDTH } = Dimensions.get("screen");
 const styles = StyleSheet.create({
     container: {
@@ -69,7 +68,7 @@ const styles = StyleSheet.create({
     },
 });
 
-const Game = ({ name, description }) => {
+const Game = ({ id, name, description }) => {
     const navigation = useNavigation();
 
     return (
@@ -83,7 +82,7 @@ const Game = ({ name, description }) => {
 
                 <TouchableOpacity
                     style={ styles.button }
-                    onPress={ () => navigation.navigate("Controller") }
+                    onPress={ () => navigation.navigate("Controller", { gameId: id }) }
                 >
                     <Text style={ styles.buttonText }>Zaigraj!</Text>
                 </TouchableOpacity>

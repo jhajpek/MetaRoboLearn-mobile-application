@@ -1,9 +1,7 @@
 import { View, Text, Image, StyleSheet, Alert, TouchableOpacity, Dimensions } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 
-
 const HEIGHT = Dimensions.get("screen").height * 0.17;
-
 
 const Header = ({ forLogin }) => {
     const ALERT_TITLE = forLogin ? "DOBRODOŠLI" : "ODABIR IGRE";

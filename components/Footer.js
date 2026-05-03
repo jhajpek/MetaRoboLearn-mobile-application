@@ -1,8 +1,6 @@
 import { View, Text, StyleSheet, Linking, Dimensions, TouchableOpacity } from "react-native";
 
-
 const HEIGHT = Dimensions.get("screen").height * 0.085;
-
 
 const Footer = () => {
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 
-const RobotList = ({ client, onRobotSelected }) => {
+const RobotList = ({ brokerClient, onRobotSelected }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [robots, setRobots] = useState([]);
     const [selectedId, setSelectedId] = useState("");
@@ -10,7 +10,7 @@ const RobotList = ({ client, onRobotSelected }) => {
     useEffect(() => {
         const fetchRobots = async () => {
             try {
-                const response = await client.requestWithAuth("/client/robot/info");
+                const response = await brokerClient.requestWithAuth("/client/robot/info");
                 const robots = await response.json();
                 const activeRobots = robots.filter(r => r.IsActivated);
                 setRobots(activeRobots);

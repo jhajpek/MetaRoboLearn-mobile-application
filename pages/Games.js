@@ -4,24 +4,9 @@ import Header from "../components/Header";
 import Triangles from "../components/Triangles";
 import Game from "../components/Game";
 import Footer from "../components/Footer";
-
+import GAMES_DATA from "../resources/GamesData";
 
 const { height: HEIGHT, width: WIDTH } = Dimensions.get("screen");
-const GAMES = [
-    {
-        id: 1,
-        name: "Slobodna vožnja",
-        description: "Ova igra pruža kontrolu nad robotom u Vašem okruženju. Moguće je upravljati robotom tipkama te kontrolirati njegovo skretanje žiroskopom. Uz to, omogućen je prijenos uživo s kamere robota.",
-        params: null
-    },
-    {
-        id: 2,
-        name: "Prepoznavanje objekata",
-        description: "Osim karakteristika poput upravljanja robotom i prijenosa uživo s kamere robota koje pruža igra Slobodna vožnja, u ovoj igri možete tražiti objekte do isteka vremena koji je predviđen za to.",
-        params: null
-    },
-];
-
 
 const Games = () => {
     const insets = useSafeAreaInsets();
@@ -66,14 +51,18 @@ const Games = () => {
                 <Header forLogin={ false } />
                 <View style={ styles.body }>
                     <Triangles trianglesHeight={ HEIGHT * 0.745 } />
-                    <FlatList data={ GAMES }
+                    <FlatList data={ GAMES_DATA }
                               keyExtractor={ (game) => game.id }
                               horizontal={ true }
                               showsHorizontalScrollIndicator={ false }
                               contentContainerStyle={ styles.list }
                               renderItem={({ item }) => (
-                                  <Game name={ item.name } description={ item.description } />
-                              )} />
+                                  <Game id={ item.id }
+                                        name={ item.name }
+                                        description={ item.description }
+                                  />
+                              )}
+                    />
                 </View>
                 <Footer />
             </View>

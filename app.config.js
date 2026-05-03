@@ -32,9 +32,9 @@ export default {
             },
             CLIENT_NAME: process.env.CLIENT_NAME,
             API_KEY: process.env.API_KEY,
-            BROKER_HTTP_API: process.env.BROKER_HTTP_API,
-            BROKER_WEBSOCKET: process.env.BROKER_WEBSOCKET,
-            VIDEO_SERVICE_WEBSOCKET: process.env.VIDEO_SERVICE_WEBSOCKET
+            BROKER_HTTP_API_BASE_URL: process.env.BROKER_HTTP_API_BASE_URL,
+            PRINT_OUTPUT_WEBSOCKET_BASE_URL: process.env.PRINT_OUTPUT_WEBSOCKET_BASE_URL,
+            CAMERA_FEED_WEBSOCKET_BASE_URL: process.env.CAMERA_FEED_WEBSOCKET_BASE_URL
         }
     }
 };

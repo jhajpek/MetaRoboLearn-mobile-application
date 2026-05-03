@@ -9,10 +9,8 @@ import Home from "./pages/Home";
 import Games  from "./pages/Games";
 import Controller from "./pages/Controller";
 
-
 enableScreens();
 const Routes = createStackNavigator();
-
 
 export default function App() {
 

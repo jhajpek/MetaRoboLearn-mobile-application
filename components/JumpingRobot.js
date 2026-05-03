@@ -1,7 +1,6 @@
 import { Animated, Dimensions, Easing, Image, Pressable, StyleSheet } from "react-native";
 import { useRef } from "react";
 
-
 const HEIGHT = Dimensions.get("screen").height;
 const ANIMATION_DURATION = 0.5;
 const styles = StyleSheet.create({
@@ -10,7 +9,6 @@ const styles = StyleSheet.create({
         height: HEIGHT * 0.6,
     },
 });
-
 
 const JumpingRobot = () => {
     const translateY = useRef(new Animated.Value(0)).current;
