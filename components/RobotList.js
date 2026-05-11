@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 
@@ -39,7 +39,7 @@ const RobotList = ({ brokerClient, onRobotSelected }) => {
                         onRobotSelected(itemValue);
                     }}
                 >
-                    {robots.length > 0 ? (
+                    { robots.length > 0 ? (
                         robots.map((robot) => (
                             <Picker.Item
                                 key={robot.RobotId}
@@ -57,9 +57,21 @@ const RobotList = ({ brokerClient, onRobotSelected }) => {
 };
 
 const styles = StyleSheet.create({
-    container: { marginVertical: 10, paddingHorizontal: 20 },
-    label: { fontSize: 16, fontWeight: 'bold', marginBottom: 5 },
-    pickerWrapper: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, backgroundColor: '#f9f9f9' }
+    container: {
+        marginVertical: 10,
+        paddingHorizontal: 20
+    },
+    label: {
+        fontSize: 15,
+        fontWeight: "bold",
+        marginBottom: 5
+    },
+    pickerWrapper: {
+        borderWidth: 1,
+        borderColor: "#ccc",
+        borderRadius: 8,
+        backgroundColor: "#f9f9f9"
+    }
 });
 
 export default RobotList;

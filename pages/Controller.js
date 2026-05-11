@@ -20,6 +20,7 @@ const { height: HEIGHT, width: WIDTH } = Dimensions.get("screen");
 const CAMERA_WIDTH = 320;
 const CAMERA_HEIGHT = 240;
 const TURN_THRESHOLD = 0.2;
+const DRIVE_THRESHOLD = 0.5;
 const COMMAND_DURATION = 0;
 const JOYSTICK_SIZE = HEIGHT * 0.5;
 const JOYSTICK_RADIUS = JOYSTICK_SIZE * 0.5
@@ -32,7 +33,6 @@ const Controller = ({ route }) => {
 
     const [accelerometerOutput, setAccelerometerOutput] = useState({ x: 0, y: 0, z: 0 });
     const [isDeviceMotionOn, setIsDeviceMotionOn] = useState(false);
-    const [angle, setAngle] = useState(0);
     const [lastCommand, setLastCommand] = useState("");
     const [speed, setSpeed] = useState(30);
     const [cameraOn, setCameraOn] = useState(false);
@@ -50,6 +50,13 @@ const Controller = ({ route }) => {
         const currentGame = GAMES_DATA.find(g => g.id === gameId);
         return currentGame?.plugin ? new currentGame.plugin() : null;
     }, [gameId]);
+
+    const renderedGamePlugin = useMemo(() => {
+        if (!gamePlugin) {
+            return null;
+        }
+        return gamePlugin.render(brokerClient, robotId);
+    }, [robotId, gamePlugin]);
 
     const cameraResponderRef = useRef(new Animated.ValueXY({ x: 0, y: HEIGHT - CAMERA_HEIGHT})).current;
     const cameraResponder = useRef(
@@ -128,11 +135,19 @@ const Controller = ({ route }) => {
     };
 
     useEffect(() => {
+        if (isDeviceMotionOn) {
+            return;
+        }
+
         const { x, y } = joystickPosition;
         const distance = Math.sqrt(x * x + y * y);
 
         if (distance === 0) {
-            abort().then()
+            setSpeed(30);
+            if (lastCommand !== "") {
+                // execute("raw_turn_left", COMMAND_DURATION);
+                abort();
+            }
             return;
         }
 
@@ -146,7 +161,7 @@ const Controller = ({ route }) => {
             newCommand = x > 0 ? "raw_turn_right" : "raw_turn_left";
         }
 
-        if (newCommand === lastCommand && speedDelta < 0.1)  {
+        if (newCommand === lastCommand && speedDelta < 1)  {
             return;
         }
 
@@ -238,6 +253,8 @@ const Controller = ({ route }) => {
         return () => accelerometerIncome?.remove();
     }, [isDeviceMotionOn, lastCommand]);
 
+    const [gamma, setGamma] = useState(0);
+    const [beta, setBeta] = useState(0);
     useEffect(() => {
         DeviceMotion.setUpdateInterval(200);
         let motionIncome;
@@ -249,7 +266,9 @@ const Controller = ({ route }) => {
                     setAccelerometerOutput({ x: 0, y: 0, z: 0 });
                     setIsDeviceMotionOn(false);
                     if (lastCommand !== "") {
-                        await abort();
+                        // setSpeed(0);
+                        // execute("raw_turn_left", COMMAND_DURATION);
+                        abort();
                     }
                     return;
                 }
@@ -258,18 +277,35 @@ const Controller = ({ route }) => {
                     return;
                 }
 
-                setAngle(rotation.beta ?? 0);
+                let beta = rotation.beta || 0;
+                setBeta(beta);
+                let gamma = rotation.gamma + 1.3 || 0;
+                setGamma(gamma);
 
-                if (lastCommand === "raw_forward" || lastCommand === "raw_back") {
-                    return;
-                }
-
-                if (angle > TURN_THRESHOLD && lastCommand !== "raw_turn_right") {
+                if (beta > TURN_THRESHOLD) {
+                    if (lastCommand === "raw_turn_right") {
+                        return;
+                    }
                     await execute("raw_turn_right", COMMAND_DURATION);
-                } else if (angle < -TURN_THRESHOLD && lastCommand !== "raw_turn_left") {
+                } else if (beta < -TURN_THRESHOLD) {
+                    if (lastCommand === "raw_turn_left") {
+                        return;
+                    }
                     await execute("raw_turn_left", COMMAND_DURATION);
-                } else if (angle >= -TURN_THRESHOLD && angle <= TURN_THRESHOLD && lastCommand !== "") {
-                    await abort();
+                } else if (gamma > DRIVE_THRESHOLD) {
+                    if (lastCommand === "raw_forward") {
+                        return;
+                    }
+                    await execute("raw_forward", COMMAND_DURATION);
+                } else if (gamma < -DRIVE_THRESHOLD) {
+                    if (lastCommand === "raw_back") {
+                        return;
+                    }
+                    await execute("raw_back", COMMAND_DURATION);
+                } else {
+                    // setSpeed(0);
+                    // execute("raw_turn_left", COMMAND_DURATION);
+                    abort();
                 }
             });
         } else motionIncome?.remove();
@@ -437,7 +473,9 @@ const Controller = ({ route }) => {
                     onValueChange={ () => {
                         setIsDeviceMotionOn(prev => !prev);
                         if(lastCommand !== "") {
-                            abort().then(() => {});
+                            // setSpeed(0);
+                            // execute("raw_turn_left", COMMAND_DURATION);
+                            abort();
                         }
                     }}
                     value={ isDeviceMotionOn }
@@ -448,7 +486,9 @@ const Controller = ({ route }) => {
             {/*<Text>*/}
             {/*    x: {joystickPosition.x.toFixed(2)} | y: {joystickPosition.y.toFixed(2)}*/}
             {/*</Text>*/}
-            { gamePlugin && gamePlugin.render(brokerClient, robotId) }
+            {/*<Text>{beta}</Text>*/}
+            {/*<Text>{gamma}</Text>*/}
+            { renderedGamePlugin && renderedGamePlugin }
 
         </View>
     );
