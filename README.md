@@ -1,80 +1,83 @@
-# MetaRoboLearn mobilna aplikacija
+# MetaRoboLearn mobile application
 
-Repozitorij predstavlja razvoj mobilne aplikacije za upravljanje ROS2 robotom pomoću pametnog telefona.<br/>
-Projekt je razvijen u **React Native** radnom okviru i podržava više načina upravljanja robotom.<br/>
-Osim toga, aplikacija je podržana i na Android i iOS uređajima.
-
----
-
-## Funkcionalni zahtjevi
-
-* Korisničke upute i intuitivnost korištenja aplikacije
-* Slanje naredbi za pokret i zaustavljanje robota
-* Upravljanje robotom nagibom uređaja
-* Detekcija pada uređaja
-* Prikaz emitiranja s kamere robota
+This repository represents the development of a mobile application for controlling the ROS2 robot using a smartphone.<br/>
+The project is developed in the **React Native** framework and supports multiple ways of controlling the robot.<br/>
+In addition, the application is supported on both Android and iOS devices.
 
 ---
 
-## Nefunkcionalni zahtjevi
+## Functional requirements
 
-* Odziv robota na slanje naredbe za pokretanje mora biti unutar jedne sekunde
-* Odziv robota na slanje naredbe za zaustavljanje mora biti unutar jedne sekunde
-* Količina uzastopno poslanih naredbi ne utječe na kvalitetu upravljanja robotom
-
----
-
-## Ustroj aplikacije
-
-Aplikacija je zamišljena kao **izbornik igara**, pri čemu svaka igra uz kontroler pruža i dodatnu vrstu interakcije s robotom.<br/>
-Ovisno o odabranoj igri, korisniku se prikazuje pripadajući kontroler kojem se dinamički nadodaju dodatne značajke.
+* User instructions
+* Sending commands to move and stop the robot
+* Control the robot by tilting the device
+* Device drop detection
+* Display of broadcasts from the robot's camera
+* Game plugins object detection
 
 ---
 
-## Git grane
+## Non-functional requirements
 
-Repozitorij sadrži **dvije glavne implementacije upravljanja robotom**:
-
-### ◉ `button-version` grana
-Prva verzija aplikacije koja koristi klasične gumbove za upravljanje robotom.
-
-**Značajke:**
-* početna i jednostavna implementacija
-* gumbovi za kretanje unaprijed, unazad, ulijevo, udesno
-* gumb za bezuvjetno zaustavljanje robota
-* manualna modifikacija parametara brzine i trajanja izvođenja kretnje
-* skretanje ulijevo i udesno nagibom mobilnog uređaja uz uključenu opciju `Žiroskop`
-* prikaz slike s kamere robota preko protokola WebSocket
-* unit testiranje komponenti
-
-### 🕹️ `thumbstick-version` grana
-Druga verzija aplikacije koja koristi **virtualni thumbstick** za kontinuirano upravljanje robotom.
-
-**Značajke:**
-* gumbovi za kretanje pretvoreni u jedan pomični gumb
-* kontinuirano slanje naredbi za kretanje dok je pomični gumb pomaknut
-* promjena vrste naredbe u ovisnosti o položaju pomičnog gumba
-* promjena brzine kretanja robota u ovisnosti pomaka gumba od njegovog početnog položaja
-* automatsko zaustavljanje robota kada korisnik ispusti prst s gumba
-* tzv. 'dead-zone' oko početnog položaja gumba
+* The robot's response to sending a start command must be within one second
+* The robot's response to sending a stop command must be within one second
+* The number of consecutive commands sent does not affect the quality of robot control
 
 ---
 
-## Lokalno pokretanje
+## Application structure
 
-Preduvjeti / instalacije:
+The application is designed as a **game menu**, with each game providing an additional type of interaction with the robot in addition to the controller.<br/>
+Depending on the selected game, the user is shown the corresponding controller to which additional features are dynamically added.
+
+---
+
+## Git branches
+
+The repository contains **two main robot control implementations**:
+
+### ◉ `button-version` branch
+
+The first version of the application that uses classic buttons to control the robot.
+
+**Features:**
+* Initial and simple implementation
+* Buttons to move forward, backward, left, right
+* Button to stop the robot unconditionally
+* Manual modification of the parameters of the speed and duration of the execution of the movement
+* Turning left and right by tilting the mobile device with the `Žiroskop` option turned on
+* Display of the image from the robot's camera via the WebSocket protocol
+* Unit testing components
+
+### 🕹️ `thumbstick-version` branch
+
+Another version of the application that uses a **virtual thumbstick** to continuously control the robot.
+
+**Features:**
+* Movement buttons converted into a single scroll button
+* Continuous sending of movement commands while the scroll button is moved
+* Change of a command type depending on the position of the scroll button
+* Change of robot movement speed depending on the displacement of the button from its initial position
+* Automatic stopping of the robot when the user releases the finger from the button
+* So-called 'dead-zone' around the initial position of the button
+
+---
+
+## Local testing
+
+Prerequisites / installations:
 * Node.js
 * Expo CLI
-* paketi iz **package.json**
-* mobilna aplikacija Expo Go
+* Packages from **package.json**
+* Expo Go mobile application
 
-Nakon kloniranja željene grane repozitorija, potrebno je pokrenuti:
+After cloning the desired branch of the repository, it is necessary to run:
 
-* `cd \<direktorij u koji je kloniran repozitorij\>`
+* `cd \<directory to which the repository was cloned\>`
 * `npm install`
 * `npm start`
 
-Na ovaj način pokreće se razvojni poslužitelj koji pruža mnoštvo opcija:
+In this way, the development server is started, which provides many options:
 * Press a │ open Android
 * Press w │ open web
 * Press j │ open debugger
@@ -82,43 +85,47 @@ Na ovaj način pokreće se razvojni poslužitelj koji pruža mnoštvo opcija:
 * Press m │ toggle menu
 * shift+m │ more tools
 * Press o │ open project code in your editor
-* QR kod s kojim se kroz Expo Go može testirati aplikacija
+* QR code with which the application can be tested through Expo Go
 
 ---
 
-## Puštanje aplikacije u pogon
+## Deployment
 
-Puštanje aplikacije u pogon (deployment) provedeno je nad verzijom button-version korištenjem Expo Application Services (EAS).<br/>
-Iako je aplikacija razvijana kao višestruka platforma (Android i iOS), u okviru ovog projekta izrađena je isključivo Android verzija.<br/>
-iOS verzija aplikacije u razvojnom okruženju ima određena ograničenja vezana uz distribuciju i instalaciju aplikacije izvan App Storea.
+The deployment of the application was carried out by using Expo Application Services (EAS).<br/>
+Although the application was developed as a multi-platform (Android and iOS), only the Android version was created within this project.<br/>
+The iOS version of the application in the development environment has certain restrictions related to the distribution and installation of the application outside the App Store.
 
-Preduvjeti / instalacije:
-* globalno instaliran eas-cli
-* Expo račun
+Prerequisites / installations:
+* Globally installed eas-cli
+* Expo account
 
-Ako preduvjeti nisu zadovoljeni, potrebno je pokrenuti:
+If the prerequisites are not met, it is necessary to start:
 * `npm install -g eas-cli`
 * `eas login`
 
-Nakon toga, potrebno je pokrenuti:
-* `eas build:configure` (ovdje odabrati platformu Android)
+After that, it is necessary to run:
+* `eas build:configure` (select Android platform here)
 * `eas build -p android --profile preview`
 
-Rezultat ovog procesa je .apk datoteka koja se može ručno instalirati na Android uređaje.
+The result of this process is an .apk file that can be manually installed on Android devices.
 
 ---
 
-## Varijable okruženja
+## Environmental variables
 
-* BACKEND_URL=http://<BACKEND_IP_ADDRESS>
-* BACKEND_PORT=\<PORT\>
+* CLIENT_NAME=<YOUR_METAROBOLEARN_CLIENT_NAME>
+* API_KEY=<YOUR_METAROBOLEARN_API_KEY>
+* BROKER_HTTP_API_BASE_URL=<YOUR_METAROBOLEARN_BROKER_HTTP_API_BASE_URL>
+* PRINT_OUTPUT_WEBSOCKET_BASE_URL=<YOUR_METAROBOLEARN_PRINT_OUTPUT_WEBSOCKET_BASE_URL>
+* CAMERA_FEED_WEBSOCKET_BASE_URL=<YOUR_METAROBOLEARN_CAMERA_FEED_WEBSOCKET_BASE_URL>
 
-U produkciji dodati još:
-* PROJECT_ID=<EXPO_PROJECT_ID>
+Add more in production:
+* EXPO_PROJECT_ID=<YOUR_EXPO_PROJECT_ID>
 
 ---
 
-## Nastavak projekta
-* dotjerivanje responzivnosti thumbstick kontrolera
-* korištenje prepoznavanja objekata i displayja u igrama
-* prelazak s WebSocketa na drugi način emitiranja s kamere robota
+## Future work
+
+* Login
+* Tweaking the responsiveness of the thumbstick controller
+* Switching from WebSocket to another way of broadcasting from the robot camera

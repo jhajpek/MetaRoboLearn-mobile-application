@@ -10,6 +10,12 @@
     "web": "expo start --web",
     "test": "jest --watchAll"
   },
+  "jest": {
+    "preset": "jest-expo",
+    "transformIgnorePatterns": [
+      "node_modules/(?!(jest-)?react-native|@react-native|@react-navigation|expo|@expo|@testing-library)"
+    ]
+  },
   "dependencies": {
     "expo": "~52.0.0",
     "expo-constants": "~17.0.3",

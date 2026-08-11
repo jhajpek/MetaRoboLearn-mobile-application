@@ -1,4 +1,5 @@
 import AnimalSearchPlugin from "../controller-plugins/implementation/AnimalSearchPlugin";
+import AnimalQuizPlugin from "../controller-plugins/implementation/AnimalQuizPlugin";
 
 const GAMES_DATA = [
     {
@@ -17,7 +18,7 @@ const GAMES_DATA = [
         id: 3,
         name: "Zoo kviz",
         description: "Osim karakteristika poput upravljanja robotom i prijenosa uživo s kamere robota koje pruža igra Slobodna vožnja, u ovoj igri možete pronaći životinju te zaigrati kviz o toj vrsti životinja.",
-        plugin: null
+        plugin: AnimalQuizPlugin
     }
 ];
 

@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, memo } from "react";
 import { View, TouchableOpacity, Text, StyleSheet, ActivityIndicator } from "react-native";
 import Constants from "expo-constants";
 import GamePlugin from "../GamePlugin";
-import ANIMAL_MAP from "../../resources/AnimalData";
+import { ANIMAL_MAP } from "../../resources/AnimalData";
 
 const PRINT_OUTPUT_WEBSOCKET_BASE_URL = Constants.expoConfig.extra.PRINT_OUTPUT_WEBSOCKET_BASE_URL;
 
-const AnimalSearchUI = ({ brokerClient, robotId }) => {
+const AnimalSearchUI = memo(({ brokerClient, robotId }) => {
     const [targets, setTargets] = useState([]);
     const [currentTargetIndex, setCurrentTargetIndex] = useState(0);
 
@@ -56,15 +56,21 @@ const AnimalSearchUI = ({ brokerClient, robotId }) => {
 
         wsRef.current.onclose = () => {
             console.log("Print Output WS closed.");
+            wsRef.current = null;
         };
 
         wsRef.current.onerror = (e) => {
             console.log("Print Output WS Error:", e.message);
+            wsRef.current = null;
         };
 
         return () => {
             if (wsRef.current) {
                 wsRef.current.close();
+                wsRef.current = null;
+            }
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
             }
         };
     }, [robotId]);
@@ -141,7 +147,7 @@ const AnimalSearchUI = ({ brokerClient, robotId }) => {
 
     const flashGreen = async () => {
         for (let i = 0; i < 10; i++) {
-            await sendCodeToRobot(count % 2 === 0 ? "display_green()" : "display_clear()");
+            await sendCodeToRobot(i % 2 === 0 ? "display_green()" : "display_clear()");
             await sleep(500);
         }
         await sendCodeToRobot("display_text('POBJEDA!')");
@@ -185,7 +191,9 @@ const AnimalSearchUI = ({ brokerClient, robotId }) => {
             )}
         </View>
     );
-};
+}, (prevProps, nextProps) => {
+    return prevProps.robotId === nextProps.robotId;
+});
 
 const styles = StyleSheet.create({
     pluginContainer: {
@@ -241,7 +249,7 @@ const styles = StyleSheet.create({
 
 class AnimalSearchPlugin extends GamePlugin {
     constructor() {
-        super("object-detection-plugin");
+        super("animal-search-plugin");
     }
 
     render(brokerClient, robotId) {

@@ -143,9 +143,7 @@ const Controller = ({ route }) => {
         const distance = Math.sqrt(x * x + y * y);
 
         if (distance === 0) {
-            setSpeed(30);
             if (lastCommand !== "") {
-                // execute("raw_turn_left", COMMAND_DURATION);
                 abort();
             }
             return;
@@ -240,21 +238,18 @@ const Controller = ({ route }) => {
     }, [cameraOn]);
 
     useEffect(() => {
-        Accelerometer.setUpdateInterval(200);
         let accelerometerIncome;
         if (isDeviceMotionOn) {
+            Accelerometer.setUpdateInterval(200);
             accelerometerIncome = Accelerometer.addListener(
-                ({ x, y, z }) => setAccelerometerOutput({ x: x, y: y, z: z })
+                ({ x, y, z}) => setAccelerometerOutput({x, y, z})
             );
-        } else {
-            accelerometerIncome?.remove();
+            return;
         }
 
         return () => accelerometerIncome?.remove();
-    }, [isDeviceMotionOn, lastCommand]);
+    }, [isDeviceMotionOn]);
 
-    const [gamma, setGamma] = useState(0);
-    const [beta, setBeta] = useState(0);
     useEffect(() => {
         DeviceMotion.setUpdateInterval(200);
         let motionIncome;
@@ -266,9 +261,7 @@ const Controller = ({ route }) => {
                     setAccelerometerOutput({ x: 0, y: 0, z: 0 });
                     setIsDeviceMotionOn(false);
                     if (lastCommand !== "") {
-                        // setSpeed(0);
-                        // execute("raw_turn_left", COMMAND_DURATION);
-                        abort();
+                        await abort();
                     }
                     return;
                 }
@@ -278,9 +271,7 @@ const Controller = ({ route }) => {
                 }
 
                 let beta = rotation.beta || 0;
-                setBeta(beta);
                 let gamma = rotation.gamma + 1.3 || 0;
-                setGamma(gamma);
 
                 if (beta > TURN_THRESHOLD) {
                     if (lastCommand === "raw_turn_right") {
@@ -303,9 +294,7 @@ const Controller = ({ route }) => {
                     }
                     await execute("raw_back", COMMAND_DURATION);
                 } else {
-                    // setSpeed(0);
-                    // execute("raw_turn_left", COMMAND_DURATION);
-                    abort();
+                    await abort();
                 }
             });
         } else motionIncome?.remove();
@@ -341,6 +330,7 @@ const Controller = ({ route }) => {
             }
         ).then(() => {
             setLastCommand("");
+            setSpeed(30);
         }).catch((err) => {
             console.log(err);
         });
@@ -370,7 +360,7 @@ const Controller = ({ route }) => {
             flexDirection: "column",
             justifyContent: "space-evenly",
             alignItems: "center",
-            gap: 20,
+            gap: 10,
             width: WIDTH / 2 - insets.left,
         },
         controller: {
@@ -394,7 +384,7 @@ const Controller = ({ route }) => {
         row: {
             flexDirection: "row",
             justifyContent: "space-between",
-            gap: 10,
+            gap: 5,
             alignItems: "center",
         },
         backButton: {
@@ -473,8 +463,6 @@ const Controller = ({ route }) => {
                     onValueChange={ () => {
                         setIsDeviceMotionOn(prev => !prev);
                         if(lastCommand !== "") {
-                            // setSpeed(0);
-                            // execute("raw_turn_left", COMMAND_DURATION);
                             abort();
                         }
                     }}
@@ -489,7 +477,6 @@ const Controller = ({ route }) => {
             {/*<Text>{beta}</Text>*/}
             {/*<Text>{gamma}</Text>*/}
             { renderedGamePlugin && renderedGamePlugin }
-
         </View>
     );
 
